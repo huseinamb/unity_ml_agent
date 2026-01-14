@@ -8,10 +8,9 @@ public class SnakeAgent : Agent
     [Header("References")]
     public GameObject goal;
     public float moveSpeed = 2f;
-    public float rotateSpeed = 100f;
     public float maxStepDistance = 0.5f; // Maximum allowed distance per step
 
-    [Header("Environment bounds")]
+    [Header("Movement bounds (visual/reference only)")]
     public float xBound = 5f;
     public float zBound = 5f;
 
@@ -23,6 +22,7 @@ public class SnakeAgent : Agent
     {
         rb = GetComponent<Rigidbody>();
         startPos = transform.position;
+        rb.sleepThreshold = 0f;
     }
 
     public override void OnEpisodeBegin()
@@ -33,12 +33,8 @@ public class SnakeAgent : Agent
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
-        // Reset goal randomly
-        goal.transform.position = new Vector3(
-            Random.Range(-xBound + 0.5f, xBound - 0.5f),
-            0.5f,
-            Random.Range(-zBound + 0.5f, zBound - 0.5f)
-        );
+        // Reset goal
+        RespawnGoal();
 
         previousDistanceToGoal = Vector3.Distance(transform.position, goal.transform.position);
     }
@@ -51,61 +47,75 @@ public class SnakeAgent : Agent
         // Snake velocity
         sensor.AddObservation(rb.linearVelocity);
 
-        // Optional: normalized position (can help learning)
+        // Optional: normalized position
         sensor.AddObservation(transform.position.x / xBound);
         sensor.AddObservation(transform.position.z / zBound);
     }
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        float moveInput = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
-        float rotateInput = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
+        float moveX = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
+        float moveZ = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
 
-        // Move the snake
-        rb.MovePosition(transform.position + transform.forward * moveInput * moveSpeed * Time.fixedDeltaTime);
-        rb.MoveRotation(transform.rotation * Quaternion.Euler(0f, rotateInput * rotateSpeed * Time.fixedDeltaTime, 0f));
+        Vector3 moveDir = new Vector3(moveX, 0f, moveZ);
 
-        // Calculate distance to goal
+        // Move using MovePosition
+        Vector3 newPos = rb.position + moveDir * moveSpeed * Time.fixedDeltaTime;
+        rb.MovePosition(newPos);
+
+        // Optional: face movement direction visually
+        if (moveDir.sqrMagnitude > 0.001f)
+            transform.forward = moveDir.normalized;
+
+        // Reward for moving closer to goal
         float currentDistance = Vector3.Distance(transform.position, goal.transform.position);
-
-        // Reward for approaching or penalize for moving away
-        float distanceDelta = previousDistanceToGoal - currentDistance;
-        SetReward(distanceDelta * 0.1f); // Scale factor for reward
+        float delta = previousDistanceToGoal - currentDistance;
+        AddReward(delta * 0.1f);
         previousDistanceToGoal = currentDistance;
-
-        // Check if snake reached the goal
-        if (currentDistance < 0.5f)
-        {
-            SetReward(1f);
-            // Respawn goal randomly
-            goal.transform.position = new Vector3(
-                Random.Range(-xBound + 0.5f, xBound - 0.5f),
-                0.5f,
-                Random.Range(-zBound + 0.5f, zBound - 0.5f)
-            );
-            previousDistanceToGoal = Vector3.Distance(transform.position, goal.transform.position);
-        }
-
-        // Check wall collisions
-        if (Mathf.Abs(transform.position.x) > xBound || Mathf.Abs(transform.position.z) > zBound)
-        {
-            SetReward(-1f);
-            EndEpisode();
-        }
-
-        // Optional: terminate if agent is stuck (exceeds max steps)
-        if (StepCount > MaxStep && MaxStep > 0)
-        {
-            SetReward(-0.5f);
-///
-            EndEpisode();
-        }
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        var continuousActionsOut = actionsOut.ContinuousActions;
-        continuousActionsOut[0] = Input.GetAxis("Vertical");   // W/S or Up/Down
-        continuousActionsOut[1] = Input.GetAxis("Horizontal"); // A/D or Left/Right
+        var actions = actionsOut.ContinuousActions;
+        actions[0] = Input.GetAxis("Horizontal"); // A/D or Left/Right
+        actions[1] = Input.GetAxis("Vertical");   // W/S or Up/Down
+    }
+
+    void RespawnGoal()
+    {
+        Collider goalCollider = goal.GetComponent<Collider>();
+        goalCollider.enabled = false;
+
+        goal.transform.position = new Vector3(
+            Random.Range(-xBound + 1f, xBound - 1f),
+            0.5f,
+            Random.Range(-zBound + 1f, zBound - 1f)
+        );
+
+        StartCoroutine(ReenableColliderNextFixed(goalCollider));
+    }
+
+    System.Collections.IEnumerator ReenableColliderNextFixed(Collider col)
+    {
+        yield return new WaitForFixedUpdate();
+        col.enabled = true;
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        // Collision with goal
+        if (collision.gameObject == goal)
+        {
+            AddReward(1f);
+            RespawnGoal();
+            previousDistanceToGoal = Vector3.Distance(transform.position, goal.transform.position);
+        }
+
+        // Collision with wall (must tag your walls as "Wall")
+        if (collision.gameObject.CompareTag("Wall"))
+        {
+            AddReward(-1f);
+            EndEpisode();
+        }
     }
 }
