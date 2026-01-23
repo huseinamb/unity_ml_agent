@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 3
   tags:
   - Snake
+  - Wall
   layers:
   - Default
   - TransparentFX
