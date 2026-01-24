@@ -29,7 +29,7 @@ public class AgentRaycaster : MonoBehaviour
             else
             {
                 Debug.Log("No hit");
-               // Debug.DrawRay(transform.position, direction * rayLength, Color.green, 0.1f);
+                Debug.DrawRay(transform.position, direction * rayLength, Color.green, 0.1f);
             }
         }
     }
