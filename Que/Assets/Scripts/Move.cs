@@ -1,27 +1,3 @@
-//using UnityEngine;
-//using System.Collections;
-
-//public class CubeMover : MonoBehaviour
-//{
-//    void Start()
-//    {
-//        StartCoroutine(MoveUpAndDown());
-//    }
-
-//    IEnumerator MoveUpAndDown()
-//    {
-//        while (true)
-//        {
-//            // Move up by 3 units
-//            transform.position += Vector3.up * 3f;
-//            yield return new WaitForSeconds(1f);
-
-//            // Move down by 3 units
-//            transform.position += Vector3.down * 3f;
-//            yield return new WaitForSeconds(1f);
-//        }
-//    }
-//}
 using UnityEngine;
 using System.Collections;
 
@@ -29,6 +5,7 @@ public class CubeMover : MonoBehaviour
 {
     public float distance = 4f;
     public float moveDuration = 10f;
+    public bool isMovingUp=false;
 
     void Start()
     {
@@ -43,9 +20,13 @@ public class CubeMover : MonoBehaviour
         while (true)
         {
             // Move up smoothly
+            isMovingUp = true;
+            Debug.Log(isMovingUp);
             yield return StartCoroutine(MoveBetween(startPos, upPos));
 
             // Move down smoothly
+            isMovingUp = false;
+            Debug.Log(isMovingUp);
             yield return StartCoroutine(MoveBetween(upPos, startPos));
         }
     }
