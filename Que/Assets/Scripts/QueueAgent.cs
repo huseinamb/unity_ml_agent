@@ -16,6 +16,7 @@ public class QueueAgent : Agent
     float maxGoalDistance;
     public CubeMover doorMover;
 
+    private static int globalEpisodeCount = 0;
 
 
     public override void Initialize()
@@ -26,6 +27,11 @@ public class QueueAgent : Agent
 
     public override void OnEpisodeBegin()
     {
+        //track episode
+
+        globalEpisodeCount++;
+        Debug.Log($"Episode {globalEpisodeCount} started");
+
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         float x = Random.Range(-12f, 12f);
@@ -141,13 +147,23 @@ public class QueueAgent : Agent
         {
             AddReward(+1f);
             Debug.Log("------------------------Got reward +1 (reached goal)------------------------------------------");
-            EndEpisode();
+            EndWithLog("Reached goal");
+            //EndEpisode();
         }
 
         if (collision.gameObject.CompareTag("Wall"))
         {
             AddReward(-0.1f);
             Debug.Log("-----------------------Got penalty -0.1 (hit wall)-------------------------------------");
+            EndWithLog("Wall Coallision");
+            //EndEpisode();
         }
     }
+
+    private void EndWithLog(string reason)
+    {
+        Debug.Log($"Episode {globalEpisodeCount} ended: {reason}");
+        EndEpisode();
+    }
+
 }
