@@ -6,6 +6,7 @@ using Unity.MLAgents.Sensors;
 public class QueueAgent : Agent
 {
     public float moveSpeed = 2f;
+    public float turnSpeed = 2f;
     public Transform goal;
 
     Rigidbody rb;
@@ -68,6 +69,7 @@ public class QueueAgent : Agent
 
         float forward = actions.ContinuousActions[0];
         float right = actions.ContinuousActions[1];
+        float turn = actions.ContinuousActions[2];
 
         Vector3 move =
             transform.forward * forward +
@@ -76,6 +78,8 @@ public class QueueAgent : Agent
         rb.MovePosition(
             rb.position + move * moveSpeed * Time.fixedDeltaTime
         );
+        Quaternion rotation =Quaternion.Euler(0f, turn * turnSpeed * Time.fixedDeltaTime, 0f);
+        rb.MoveRotation(rb.rotation * rotation);
 
         float currentDistance = Vector3.Distance(transform.position, goal.position);
 
@@ -91,21 +95,38 @@ public class QueueAgent : Agent
         }
 
         previousDistanceToGoal = currentDistance;
+        // ---- Facing reward ----
+        Vector3 toGoal = (goal.position - transform.position).normalized;
+        // float facingScore = Vector3.Dot(transform.forward, toGoal);
+        float facingScore = Vector3.Dot(-transform.forward, toGoal);
+
+        float facingReward = Mathf.Max(0f, facingScore) * 0.02f;
+        
+
+        AddReward(facingReward);
+        Debug.Log("------------Facing Reward ---------------");
+        Debug.Log(facingReward.ToString());
     }
 
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        var actions = actionsOut.ContinuousActions;
+        var a = actionsOut.ContinuousActions;
 
-        actions[0] = 0f;
-        actions[1] = 0f;
+        a[0] = 0f; // forward/back
+        a[1] = 0f; // left/right
+        a[2] = 0f; // turn
 
-        if (Input.GetKey(KeyCode.W)) actions[0] = 1f;
-        if (Input.GetKey(KeyCode.S)) actions[0] = -1f;
-        if (Input.GetKey(KeyCode.D)) actions[1] = 1f;
-        if (Input.GetKey(KeyCode.A)) actions[1] = -1f;
+        if (Input.GetKey(KeyCode.W)) a[0] = 1f;
+        if (Input.GetKey(KeyCode.S)) a[0] = -1f;
+
+        if (Input.GetKey(KeyCode.D)) a[1] = 1f;
+        if (Input.GetKey(KeyCode.A)) a[1] = -1f;
+
+        if (Input.GetKey(KeyCode.E)) a[2] = 1f;
+        if (Input.GetKey(KeyCode.Q)) a[2] = -1f;
     }
+
 
     private void OnCollisionEnter(Collision collision)
     {
@@ -113,7 +134,7 @@ public class QueueAgent : Agent
         {
             AddReward(-1f);
             Debug.Log("------------------------Got penalty -1 (hit door)-------------------------------");
-            EndEpisode();
+           // EndEpisode();
         }
 
         if (collision.gameObject.CompareTag("GoalPlane"))
